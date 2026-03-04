@@ -146,13 +146,3 @@ No la uses contra sistemas sin permiso. El uso indebido es ilegal y va en contra
 ## Licencia
 
 Consulta el archivo `LICENSE` para más detalles.
-
----
-
-## Autora
-
-Desarrollado por **TheOffSecGirl**
-
-- GitHub: https://github.com/theoffsecgirl
-- Web técnica: https://www.theoffsecgirl.com
-- Academia: https://www.northstaracademy.io
