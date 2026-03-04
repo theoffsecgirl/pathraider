@@ -1,158 +1,253 @@
-# tool-lfdscanner
+# tool-lfdscanner v2.0
 
-Escáner ofensivo de **Local File Disclosure (LFD)** y **Directory Traversal** escrito en Python.
-
-Pensado para bug bounty, pentesting web y laboratorios de seguridad donde se necesita comprobar rápidamente si un parámetro permite leer archivos locales del sistema.
+Escáner avanzado de **Local File Disclosure (LFD)** y **Directory Traversal** con detección mejorada y reporting completo.
 
 ---
 
-## Características
+## 🚀 Novedades v2.0 (2026)
 
-- Soporte para:
-  - un único objetivo (`--url`)
-  - múltiples objetivos desde archivo (`--list`)
-- Inyección de rutas mediante:
-  - marcador `FUZZ` en la URL
-  - parámetro configurable (`--param`, por defecto `file`)
-- Conjunto de rutas de traversal por defecto (Unix y Windows).
-- Soporte para rutas personalizadas desde archivo.
-- Detección heurística de contenido interesante:
-  - `/etc/passwd`
-  - `/etc/hosts`
-  - `win.ini`
-  - patrones típicos de sistema.
-- Escaneo concurrente con hilos por objetivo.
-- User-Agent configurable.
-- Opción `--insecure` para entornos de prueba.
-- Exportación de resultados a JSON.
+### Mejoras Técnicas
+- ✅ **Biblioteca de payloads ampliada** (55+ paths Unix/Windows)
+- ✅ **Detección inteligente** con múltiples patrones de firma
+- ✅ **Sistema de confianza** (high/medium/low)
+- ✅ **Encoding bypass** (URL, double URL, base64)
+- ✅ **Baseline differential analysis** para reducción de falsos positivos
+- ✅ **Rate limiting** configurable
+- ✅ **Autenticación** con headers personalizados
+- ✅ **JSON reporting** estructurado
 
----
-
-## Requisitos
-
-- Python 3.8 o superior.
-- Librerías de Python:
-
-```bash
-pip install requests colorama
-```
+### Payloads Mejorados
+- Paths de hasta 7 niveles de profundidad
+- Archivos sensibles: `/etc/shadow`, `/etc/hostname`, `/proc/self/environ`
+- Logs de sistema: `/var/log/auth.log`, `/var/log/apache2/access.log`
+- Windows: `boot.ini`, `SAM`, absolute paths
+- Bypass: null byte, double encoding, dot truncation
 
 ---
 
-## Instalación
+## 📦 Instalación
 
 ```bash
 git clone https://github.com/theoffsecgirl/tool-lfdscanner.git
 cd tool-lfdscanner
-chmod +x tool-lfdscanner.py
-```
-
-Si prefieres, renombra el archivo:
-
-```bash
-mv tool-lfdscanner.py lfdscanner.py
-chmod +x lfdscanner.py
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ---
 
-## Uso básico
+## 🔥 Uso Básico
 
-### Un solo objetivo
+### Un solo objetivo con FUZZ
 
 ```bash
-python3 tool-lfdscanner.py -u "https://example.com/download.php?file=FUZZ"
+python3 lfdscanner.py -u "https://target.com/download.php?file=FUZZ"
 ```
-
-En este caso, `FUZZ` será reemplazado por cada ruta de traversal.
 
 ### Lista de objetivos
 
 ```bash
-python3 tool-lfdscanner.py -L dominios.txt
+python3 lfdscanner.py -L targets.txt -o results.json
 ```
 
-Archivo `dominios.txt`:
-
-```text
-https://example.com/download.php?file=FUZZ
-https://victima.com/view?path=FUZZ
-```
-
----
-
-## Parámetros principales
-
-```text
--u, --url          URL objetivo (puede contener FUZZ)
--L, --list         Archivo con lista de objetivos
---paths            Archivo con rutas de traversal personalizadas
--p, --param        Nombre del parámetro cuando no hay FUZZ (por defecto: file)
--t, --timeout      Timeout por petición (por defecto: 5)
--T, --threads      Hilos por objetivo (por defecto: 10)
--A, --agent        User-Agent personalizado
---insecure         No verificar TLS (solo entornos de laboratorio)
---json-output      Guardar resultados en JSON
--v, --verbose      Mostrar más información
-```
-
-### Ejemplos
+### Con encoding bypass
 
 ```bash
-# Escaneo rápido con marcador FUZZ
-python3 tool-lfdscanner.py -u "https://example.com/get.php?f=FUZZ"
+python3 lfdscanner.py -u "https://target.com/view?path=FUZZ" \
+  --encoding-bypass \
+  -v
+```
 
-# Escaneo usando parámetro file
-python3 tool-lfdscanner.py -u "https://example.com/get.php" -p file
+### Con autenticación
 
-# Lista de objetivos y rutas personalizadas
-python3 tool-lfdscanner.py -L scope.txt --paths traversal_paths.txt -T 20
-
-# Guardar resultados JSON
-python3 tool-lfdscanner.py -L scope.txt --json-output resultados_lfd.json
+```bash
+python3 lfdscanner.py -u "https://app.com/files?file=FUZZ" \
+  --auth-header "Authorization: Bearer TOKEN"
 ```
 
 ---
 
-## Interpretación de resultados
+## ⚙️ Opciones CLI
 
-Cuando se detecta una posible vulnerabilidad se mostrará una salida similar a:
+| Flag                | Descripción                                      |
+|---------------------|-------------------------------------------------|
+| `-u, --url`         | URL objetivo (puede contener FUZZ)              |
+| `-L, --list`        | Archivo con lista de URLs                       |
+| `--paths`           | Archivo con paths personalizados                |
+| `-p, --param`       | Parámetro a inyectar (default: file)            |
+| `-t, --timeout`     | Timeout en segundos (default: 5)                |
+| `-T, --threads`     | Número de threads (default: 10)                 |
+| `-A, --agent`       | User-Agent personalizado                        |
+| `--auth-header`     | Header de autenticación                         |
+| `--insecure`        | Desactivar verificación TLS                     |
+| `--rate-limit`      | Peticiones por segundo (default: 20)            |
+| `--encoding-bypass` | Intentar bypass con encoding                    |
+| `-o, --json-output` | Guardar resultados en JSON                      |
+| `-v, --verbose`     | Modo verbose                                    |
 
-```text
-[+] Posible LFD/Traversal en https://example.com/get.php?file=../../etc/passwd
-    path: ../../etc/passwd
-    status: 200
-    snippet: root:x:0:0:root:/root:/bin/bash
+---
+
+## 🎯 Detección Mejorada
+
+### Patrones de Firma
+
+**Unix/Linux (`/etc/passwd`):**
+- `root:x:0:0:`
+- `daemon:x:`
+- `/bin/bash`
+- `nobody:x:`
+
+**Shadow File (`/etc/shadow`):**
+- `$6$` (SHA-512 hash)
+- `$5$` (SHA-256 hash)
+- `root:!:`
+
+**Windows:**
+- `[extensions]`
+- `[fonts]`
+- `C:\WINDOWS`
+- `[MCI Extensions]`
+
+**Log Files:**
+- `GET /`
+- `User-Agent:`
+- `HTTP/1.1`
+
+### Sistema de Confianza
+
+- **High**: Archivo sensible confirmado (passwd, shadow, win.ini)
+- **Medium**: Archivo de log o sistema con patrones parciales
+- **Low**: Detección heurística
+
+---
+
+## 📊 Formato JSON Output
+
+```json
+{
+  "generated_at": "2026-03-04T17:30:00Z",
+  "scanner_version": "2.0",
+  "targets_scanned": 5,
+  "vulnerabilities_found": 3,
+  "confidence_summary": {
+    "high": 2,
+    "medium": 1,
+    "low": 0
+  },
+  "findings": {
+    "https://target.com/download.php": [
+      {
+        "url": "https://target.com/download.php?file=../../etc/passwd",
+        "payload": "../../etc/passwd",
+        "encoding": "none",
+        "status_code": 200,
+        "response_size": 1547,
+        "evidence": "Archivo Unix detectado: root:x:0:0:",
+        "confidence": "high",
+        "timestamp": 1709577600.123
+      }
+    ]
+  }
+}
 ```
 
-Esto indica que el servidor probablemente está devolviendo contenido del archivo local solicitado.
+---
 
-Siempre valida manualmente el contexto y el impacto.
+## 💻 Ejemplos Avanzados
+
+### Bug Bounty Pipeline
+
+```bash
+# Escaneo de múltiples subdominios
+cat subdomains.txt | while read domain; do
+  python3 lfdscanner.py -u "https://$domain/view?file=FUZZ" \
+    --threads 20 \
+    --encoding-bypass \
+    -o "lfd_$domain.json"
+done
+```
+
+### Con paths personalizados
+
+```bash
+# custom_paths.txt
+../../../app/config/database.yml
+../../../.env
+../../../config/secrets.json
+
+python3 lfdscanner.py -L targets.txt \
+  --paths custom_paths.txt \
+  --threads 15
+```
+
+### Rate limiting para WAF bypass
+
+```bash
+python3 lfdscanner.py -u "https://target.com/api/file?path=FUZZ" \
+  --rate-limit 5 \
+  --encoding-bypass \
+  -v
+```
 
 ---
 
-## Uso ético
+## 🧰 Payloads Incluidos
 
-Esta herramienta está pensada para:
+### Unix/Linux (45+ paths)
+- `/etc/passwd` (7 niveles)
+- `/etc/shadow` (5 niveles)
+- `/etc/hosts`, `/etc/hostname`, `/etc/issue`
+- `/proc/self/environ`, `/proc/version`
+- `/var/log/auth.log`, `/var/log/apache2/access.log`
+- Absolute paths: `/etc/passwd`
 
-- programas de bug bounty
-- pruebas en entornos de laboratorio
-- auditorías autorizadas
+### Windows (10+ paths)
+- `win.ini`, `system.ini`, `boot.ini`
+- `drivers/etc/hosts`
+- `system32/config/sam`
+- Absolute paths: `C:/windows/win.ini`
 
-No la uses contra sistemas sin permiso. El uso indebido es ilegal y va en contra del propósito del proyecto.
+### Bypass Techniques
+- Null byte: `../../etc/passwd%00`
+- Double encoding: `..%252f..%252fetc%252fpasswd`
+- Dot truncation: `../../etc/passwd.........`
 
 ---
 
-## Licencia
+## ⚠️ Limitaciones
 
-Consulta el archivo `LICENSE` para más detalles.
+- No soporta POST body injection (solo GET params)
+- Encoding bypass limitado a URL/double URL/base64
+- Detección basada en patrones (puede tener falsos positivos)
+- No realiza análisis de permisos del archivo extraído
+
+**tool-lfdscanner es una herramienta de reconnaissance, no un reemplazo de análisis manual.**
 
 ---
 
-## Autora
+## 🔬 Roadmap
 
-Desarrollado por **TheOffSecGirl**
+- [ ] POST body injection support
+- [ ] Base64 encoding bypass
+- [ ] Wrapper protocols (php://, file://, etc.)
+- [ ] Automated evidence extraction
+- [ ] HTML reporting
+- [ ] Integration con Burp Suite
 
-- GitHub: https://github.com/theoffsecgirl
-- Web técnica: https://www.theoffsecgirl.com
-- Academia: https://www.northstaracademy.io
+---
+
+## 📖 Uso Ético
+
+Utiliza esta herramienta únicamente en:
+- ✅ Sistemas propios
+- ✅ Entornos autorizados
+- ✅ Programas de bug bounty con scope definido
+
+**El uso no autorizado es ilegal.**
+
+---
+
+## 📜 Licencia
+
+MIT License
