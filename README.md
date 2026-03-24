@@ -1,6 +1,6 @@
 <div align="center">
 
-# tool-lfdscanner
+# pathraider
 
 **Escáner ofensivo de Local File Disclosure y Directory Traversal**
 
@@ -14,31 +14,55 @@
 
 ---
 
+```text
+┌──────────────────────────────────────────────────────┐
+│                                                      │
+│  ██████╗  ██████╗ ███████╗██╗  ██╗                  │
+│  ██╔══██╗██╔════╝ ██╔════╝██║  ██║                  │
+│  ██████╔╝███████╗█████╗  ███████║                  │
+│  ██╔═══╝ ██╔══██╗██╔══╝  ██╔══██║                  │
+│  ██║     ╚██████╔╝███████╗██║  ██║                  │
+│  ╚═╝      ╚═════╝ ╚══════╝╚═╝  ╚═╝                  │
+│                                                      │
+│  ██████╗  ██████╗ ██╗ █████╗  ██████╗         │
+│  ██╔══██╗██╔══██╗██║██╔══██╗██╔════╝         │
+│  ██████╔╝██████╔╝██║██║  ██║█████╗           │
+│  ██╔═══╝ ██╔══██╗██║██║  ██║██╔══╝           │
+│  ██║     ██║  ██║██║╚█████╔╝╚██████╗         │
+│  ╚═╝     ╚═╝  ╚═╝╚═╝ ╚════╝  ╚═════╝         │
+│                                                      │
+│    LFD & Directory Traversal scanner                 │
+│    encodings: plain · %2e · doble · unicode · null   │
+│    by theoffsecgirl                                  │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
 ## ¿Qué hace?
 
-Comprueba si un parámetro de una aplicación web permite leer archivos locales del sistema (LFD / Path Traversal). Pensado para bug bounty, pentesting web y laboratorios de seguridad.
+Comprueba si un parámetro de una aplicación web permite leer archivos locales del sistema (LFD / Path Traversal). Genera automáticamente variantes de encoding para bypassear filtros y WAFs.
 
 ---
 
 ## Características
 
 - Un objetivo (`--url`) o múltiples desde archivo (`--list`)
-- Inyección con marcador `FUZZ` en la URL o parámetro configurable (`--param`)
-- Rutas de traversal por defecto (Unix y Windows) o personalizadas
+- Inyección con marcador `FUZZ` o parámetro configurable (`--param`)
+- **132 rutas de prueba** generadas automáticamente desde 12 rutas base con encodings:
+  - Plain, `%2e%2e%2f`, doble encoding, `..%2f`, backslash, `..%5c`, unicode overlong, `%c0%ae`, null byte
 - Detección heurística de contenido sensible (`/etc/passwd`, `win.ini`, etc.)
-- Escaneo concurrente con hilos por objetivo
-- User-Agent configurable y opción `--insecure` para labs
-- Exportación de resultados a JSON
+- Escaneo concurrente con hilos
+- Exportación a JSON
 
 ---
 
 ## Instalación
 
 ```bash
-git clone https://github.com/theoffsecgirl/tool-lfdscanner.git
-cd tool-lfdscanner
+git clone https://github.com/theoffsecgirl/pathraider.git
+cd pathraider
 pip install requests colorama
-chmod +x tool-lfdscanner.py
 ```
 
 ---
@@ -46,17 +70,17 @@ chmod +x tool-lfdscanner.py
 ## Uso
 
 ```bash
-# Escaneo con marcador FUZZ
-python3 tool-lfdscanner.py -u "https://example.com/download.php?file=FUZZ"
+# Escaneo con FUZZ
+python3 LFDScanner.py -u "https://example.com/download.php?file=FUZZ"
 
-# Escaneo usando parámetro
-python3 tool-lfdscanner.py -u "https://example.com/get.php" -p file
+# Con parámetro
+python3 LFDScanner.py -u "https://example.com/get.php" -p file
 
 # Lista de objetivos
-python3 tool-lfdscanner.py -L scope.txt --paths traversal_paths.txt -T 20
+python3 LFDScanner.py -L scope.txt -T 20
 
-# Exportar a JSON
-python3 tool-lfdscanner.py -L scope.txt --json-output resultados_lfd.json
+# Exportar JSON
+python3 LFDScanner.py -L scope.txt --json-output resultados.json
 ```
 
 ---
@@ -66,34 +90,21 @@ python3 tool-lfdscanner.py -L scope.txt --json-output resultados_lfd.json
 ```text
 -u, --url          URL objetivo (puede contener FUZZ)
 -L, --list         Archivo con lista de objetivos
---paths            Archivo con rutas de traversal personalizadas
--p, --param        Parámetro cuando no hay FUZZ (default: file)
+--paths            Rutas de traversal personalizadas
+-p, --param        Parámetro sin FUZZ (default: file)
 -t, --timeout      Timeout por petición (default: 5)
 -T, --threads      Hilos por objetivo (default: 10)
 -A, --agent        User-Agent personalizado
---insecure         No verificar TLS (solo laboratorio)
+--insecure         Desactivar verificación TLS
 --json-output      Guardar resultados en JSON
 -v, --verbose      Más información
 ```
 
 ---
 
-## Output esperado
-
-```text
-[+] Posible LFD/Traversal en https://example.com/get.php?file=../../etc/passwd
-    path: ../../etc/passwd
-    status: 200
-    snippet: root:x:0:0:root:/root:/bin/bash
-```
-
-Valida siempre manualmente el contexto y el impacto.
-
----
-
 ## Uso ético
 
-Solo para programas de bug bounty, laboratorios y auditorías autorizadas. El uso sin permiso es ilegal.
+Solo para bug bounty, laboratorios y auditorías autorizadas.
 
 ---
 
