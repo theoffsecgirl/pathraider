@@ -2,7 +2,7 @@
 
 # pathraider
 
-**Offensive LFD and Directory Traversal scanner**
+**Escáner ofensivo de Local File Disclosure y Directory Traversal**
 
 ![Language](https://img.shields.io/badge/Python-3.8+-9E4AFF?style=flat-square&logo=python&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.1.0-9E4AFF?style=flat-square)
@@ -11,7 +11,7 @@
 
 *by [theoffsecgirl](https://github.com/theoffsecgirl)*
 
-> 🇪🇸 [Versión en español](README.es.md)
+> 🇬🇧 [English version](README.md)
 
 </div>
 
@@ -35,32 +35,32 @@
 │  ╚═╝     ╚═╝  ╚═╝╚═╝ ╚════╝  ╚═════╝        │
 │                                                      │
 │    LFD & Directory Traversal scanner  v1.1.0         │
-│    encodings: plain · %2e · double · unicode · null  │
+│    encodings: plain · %2e · doble · unicode · null   │
 │    by theoffsecgirl                                  │
 └──────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## What does it do?
+## ¿Qué hace?
 
-Checks whether a web application parameter allows reading local system files (LFD / Path Traversal). Automatically generates encoding variants to bypass filters and WAFs.
-
----
-
-## Features
-
-- Single target (`--url`) or multiple from file (`--list`)
-- Injection via `FUZZ` marker or configurable parameter (`--param`)
-- **132 test paths** auto-generated from 12 base paths with encodings:
-  - Plain, `%2e%2e%2f`, double encoding, `..%2f`, backslash, `..%5c`, unicode overlong, `%c0%ae`, null byte
-- Heuristic detection of sensitive content (`/etc/passwd`, `win.ini`, etc.)
-- Concurrent scanning with threads
-- JSON export
+Comprueba si un parámetro de una aplicación web permite leer archivos locales del sistema (LFD / Path Traversal). Genera automáticamente variantes de encoding para bypassear filtros y WAFs.
 
 ---
 
-## Installation
+## Características
+
+- Un objetivo (`--url`) o múltiples desde archivo (`--list`)
+- Inyección con marcador `FUZZ` o parámetro configurable (`--param`)
+- **132 rutas de prueba** generadas automáticamente desde 12 rutas base con encodings:
+  - Plain, `%2e%2e%2f`, doble encoding, `..%2f`, backslash, `..%5c`, unicode overlong, `%c0%ae`, null byte
+- Detección heurística de contenido sensible (`/etc/passwd`, `win.ini`, etc.)
+- Escaneo concurrente con hilos
+- Exportación a JSON
+
+---
+
+## Instalación
 
 ```bash
 git clone https://github.com/theoffsecgirl/pathraider.git
@@ -70,51 +70,51 @@ pip install requests colorama
 
 ---
 
-## Usage
+## Uso
 
 ```bash
-# Scan with FUZZ marker
+# Escaneo con FUZZ
 python3 pathraider.py -u "https://example.com/download.php?file=FUZZ"
 
-# With parameter
+# Con parámetro
 python3 pathraider.py -u "https://example.com/get.php" -p file
 
-# List of targets
+# Lista de objetivos
 python3 pathraider.py -L scope.txt -T 20
 
-# Export JSON
-python3 pathraider.py -L scope.txt --json-output results.json
+# Exportar JSON
+python3 pathraider.py -L scope.txt --json-output resultados.json
 
-# Show version
+# Ver versión
 python3 pathraider.py --version
 ```
 
 ---
 
-## Parameters
+## Parámetros
 
 ```text
--u, --url          Target URL (can contain FUZZ)
--L, --list         File with list of targets
---paths            Custom traversal paths
--p, --param        Parameter without FUZZ (default: file)
--t, --timeout      Timeout per request (default: 5)
--T, --threads      Threads per target (default: 10)
--A, --agent        Custom User-Agent
---insecure         Disable TLS verification
---json-output      Save results to JSON
--v, --verbose      More output
-    --version      Show version
+-u, --url          URL objetivo (puede contener FUZZ)
+-L, --list         Archivo con lista de objetivos
+--paths            Rutas de traversal personalizadas
+-p, --param        Parámetro sin FUZZ (default: file)
+-t, --timeout      Timeout por petición (default: 5)
+-T, --threads      Hilos por objetivo (default: 10)
+-A, --agent        User-Agent personalizado
+--insecure         Desactivar verificación TLS
+--json-output      Guardar resultados en JSON
+-v, --verbose      Más información
+    --version      Muestra la versión
 ```
 
 ---
 
-## Ethical use
+## Uso ético
 
-For bug bounty, labs and authorized audits only.
+Solo para bug bounty, laboratorios y auditorías autorizadas.
 
 ---
 
-## License
+## Licencia
 
 MIT · [theoffsecgirl](https://theoffsecgirl.com)
